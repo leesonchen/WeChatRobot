@@ -67,6 +67,8 @@ class Robot(Job):
     def toChitchat(self, msg: WxMsg) -> bool:
         """闲聊，接入 ChatGPT
         """
+        self.LOG.info(f"收到来自{msg.sender}({msg.from_group()},{msg.roomid})的闲聊：{msg.content}")
+
         if not self.chat:  # 没接 ChatGPT，固定回复
             rsp = "你@我干嘛？"
         else:  # 接了 ChatGPT，智能回复
@@ -126,6 +128,7 @@ class Robot(Job):
     def onMsg(self, msg: WxMsg) -> int:
         try:
             self.LOG.info(msg)  # 打印信息
+            # self.LOG.info(f"onMsg:{msg.content}")  # 打印信息
             self.processMsg(msg)
         except Exception as e:
             self.LOG.error(e)
@@ -147,6 +150,8 @@ class Robot(Job):
             wxids = at_list.split(",")
             for wxid in wxids:
                 # 这里偷个懒，直接 @昵称。有必要的话可以通过 MicroMsg.db 里的 ChatRoom 表，解析群昵称
+                if self.allContacts.get(wxid, '') == '':
+                    self.allContacts = self.getAllContacts()
                 ats += f" @{self.allContacts.get(wxid, '')}"
 
         # {msg}{ats} 表示要发送的消息内容后面紧跟@，例如 北京天气情况为：xxx @张三，微信规定需这样写，否则@不生效
@@ -163,6 +168,7 @@ class Robot(Job):
         格式: {"wxid": "NickName"}
         """
         contacts = self.wcf.query_sql("MicroMsg.db", "SELECT UserName, NickName FROM Contact;")
+        self.LOG.info(f"加载联系人列表，共 {len(contacts)}: {contacts}")
         return {contact["UserName"]: contact["NickName"]for contact in contacts}
 
     def keepRunningAndBlockProcess(self) -> None:
@@ -179,17 +185,27 @@ class Robot(Job):
             v3 = xml.attrib["encryptusername"]
             v4 = xml.attrib["ticket"]
             scene = xml.attrib["scene"]
+            self.LOG.info(f"收到好友请求：{v3} {v4} {scene}")
             self.wcf.accept_new_friend(v3, v4, scene)
 
         except Exception as e:
             self.LOG.error(f"同意好友出错：{e}")
 
     def sayHiToNewFriend(self, msg: WxMsg) -> None:
-        nickName = re.findall(r"你已添加了(.*)，现在可以开始聊天了。", msg.content)
+        if msg.from_group():
+            nickName = re.findall(r".*邀请\"(.+)\"加入", msg.content)
+            if nickName is None:
+                nickName = re.findall(r"\"(.+)\"通过扫描.*加入", msg.content)
+        else:
+            nickName = re.findall(r"你已添加了(.*)，现在可以开始聊天了。", msg.content)
+
         if nickName:
             # 添加了好友，更新好友列表
             self.allContacts[msg.sender] = nickName[0]
-            self.sendTextMsg(f"Hi {nickName[0]}，我自动通过了你的好友请求。", msg.sender)
+            if msg.from_group():
+                self.sendTextMsg(f"🧨🧨🧨 \n欢迎 {nickName[0]} 加入，\n进群请先看群公告，谢谢！", msg.roomid)
+            else:
+                self.sendTextMsg(f"你好 {nickName[0]}，很高兴认识你~ ", msg.sender)
 
     def enableHTTP(self) -> None:
         """暴露 HTTP 发送消息接口供外部调用，不配置则忽略"""

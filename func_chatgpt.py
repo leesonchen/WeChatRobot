@@ -2,9 +2,11 @@
 # -*- coding: utf-8 -*-
 
 from datetime import datetime
+from configuration import Config
 
 import openai
-
+import time
+import logging
 
 class ChatGPT():
 
@@ -16,17 +18,37 @@ class ChatGPT():
             openai.proxy = {"http": proxy, "https": proxy}
         self.conversation_list = {}
         self.system_content_msg = {"role": "system", "content": prompt}
+        self.LOG = logging.getLogger("Chat")
+        self.LOG.info("ChatGPT inited")
+
 
     def get_answer(self, question: str, wxid: str) -> str:
         # wxid或者roomid,个人时为微信id，群消息时为群id
         self.updateMessage(wxid, question, "user")
 
+        # minimalTime如果配置不为空，则使用配置的时间，否则使用默认的时间5
+        if Config().CHATGPT.get("minimal"):
+            minimalTime = Config().CHATGPT.get("minimal")
+        else:
+            minimalTime = 5
+
         try:
+            time_start = datetime.now()  # 记录开始时间
+
+            self.LOG.info(self.conversation_list[wxid])
+
             ret = openai.ChatCompletion.create(
                 model="gpt-3.5-turbo",
                 messages=self.conversation_list[wxid],
                 temperature=0.2
             )
+            time_end = datetime.now()  # 记录结束时间
+            if (time_end - time_start).total_seconds() < minimalTime:
+                sleepTime = minimalTime - (time_end - time_start).total_seconds()
+                time.sleep(sleepTime)
+                print(f"等待{round(sleepTime, 2)}s")
+
+            # self.LOG.info(f"openai ret={ret}")
 
             rsp = ret["choices"][0]["message"]["content"]
             rsp = rsp[2:] if rsp.startswith("\n\n") else rsp
@@ -39,9 +61,11 @@ class ChatGPT():
         except openai.error.APIError as e1:
             rsp = "OpenAI API 返回了错误：" + str(e1)
         except Exception as e0:
-            rsp = "发生未知错误：" + str(e0)
-
-        # print(self.conversation_list[wxid])
+            # 如果错误包含“rate limit”字符串，说明超过了每分钟3次的限制
+            if str(e0).find("rate limit") != -1:
+                rsp = "问得太快了，让我歇一会儿再来"
+            else:
+                rsp = "发生未知错误：" + str(e0)
 
         return rsp
 
@@ -76,7 +100,6 @@ class ChatGPT():
 
 
 if __name__ == "__main__":
-    from configuration import Config
     config = Config().CHATGPT
     if not config:
         exit(0)
