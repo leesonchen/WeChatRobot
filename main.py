@@ -12,6 +12,7 @@ from robot import Robot
 def weather_report(robot: Robot) -> None:
     """模拟发送天气预报
     """
+    robot.LOG.info("准备发送天气预报···")
 
     # 获取接收人
     receivers = ["filehelper"]
@@ -54,7 +55,7 @@ def main():
     robot.onEveryTime("07:00", weather_report, robot=robot)
 
     # 每天 7:30 发送新闻
-    robot.onEveryTime("07:30", robot.newsReport)
+    robot.onEveryTime(config.NEWS["times"], robot.newsReport)
 
     # 让机器人一直跑
     robot.keepRunningAndBlockProcess()

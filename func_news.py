@@ -33,9 +33,11 @@ class News(object):
             self.LOG.error(e)
             return ""
 
+        oldNews = False
         weekday_now = datetime.now().weekday()
         if weekday_news != weekday_now:
-            return ""  # 旧闻，观察发现周二～周六早晨6点半左右发布
+            oldNews = True
+            # return ""  # 旧闻，观察发现周二～周六早晨6点半左右发布
 
         fmt_time = time.strftime("%Y年%m月%d日", ts)
 
@@ -43,7 +45,11 @@ class News(object):
         fmt_news = "".join(etree.HTML(news).xpath(" // text()"))
         fmt_news = re.sub(r"周[一|二|三|四|五|六|日]你需要知道的", r"", fmt_news)
 
-        return f"{fmt_time} {self.week[weekday_news]}\n{fmt_news}"
+        oldNewsStr = ""
+        if oldNews:
+            oldNewsStr = "（重发）"
+
+        return f"{fmt_time}{self.week[weekday_news]}{oldNewsStr}\n{fmt_news}"
 
 
 if __name__ == "__main__":

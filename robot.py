@@ -205,10 +205,12 @@ class Robot(Job):
         self.LOG.info(f"HTTP listening on http://{c['host']}:{c['port']}")
 
     def newsReport(self) -> None:
-        receivers = self.config.NEWS
+        receivers = self.config.NEWS["receivers"]
         if not receivers:
             return
 
         news = News().get_important_news()
+        self.LOG.info(f"获取到新闻内容：{news}")
+
         for r in receivers:
             self.sendTextMsg(news, r)

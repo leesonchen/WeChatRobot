@@ -43,6 +43,7 @@ groups:
 
 news:
   receivers: [] # 定时新闻接收人（roomid 或者 wxid）
+  times: ["07:30", "19:30"] # 每日新闻发送时间列表
 
 # 如果要使用 ChatGPT，取消下面的注释并填写相关内容
 # chatgpt:
