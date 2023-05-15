@@ -104,6 +104,9 @@ class Robot(Job):
             if msg.is_at(self.wxid):   # 被@
                 self.toAt(msg)
 
+            elif msg.type == 10000:  # 系统信息
+                self.sayHiToNewFriend(msg)
+
             else:                # 其他消息
                 self.toChengyu(msg)
 
@@ -127,8 +130,7 @@ class Robot(Job):
 
     def onMsg(self, msg: WxMsg) -> int:
         try:
-            self.LOG.info(msg)  # 打印信息
-            # self.LOG.info(f"onMsg:{msg.content}")  # 打印信息
+            self.LOG.info(f"onMsg:msg.from_group={msg.from_group()}, msg.roomid={msg.roomid}, msg.type={msg.type}, msg.sender={msg.sender}, msg.content={msg.content}")
             self.processMsg(msg)
         except Exception as e:
             self.LOG.error(e)
@@ -150,9 +152,13 @@ class Robot(Job):
             wxids = at_list.split(",")
             for wxid in wxids:
                 # 这里偷个懒，直接 @昵称。有必要的话可以通过 MicroMsg.db 里的 ChatRoom 表，解析群昵称
-                if self.allContacts.get(wxid, '') == '':
+                wxname = self.allContacts.get(wxid, '')
+                if wxname == '':
                     self.allContacts = self.getAllContacts()
-                ats += f" @{self.allContacts.get(wxid, '')}"
+                    wxname = self.allContacts.get(wxid, '')
+
+                if wxname != '':
+                    ats += f" @{wxname}"
 
         # {msg}{ats} 表示要发送的消息内容后面紧跟@，例如 北京天气情况为：xxx @张三，微信规定需这样写，否则@不生效
         if ats == "":
@@ -193,19 +199,20 @@ class Robot(Job):
 
     def sayHiToNewFriend(self, msg: WxMsg) -> None:
         if msg.from_group():
-            nickName = re.findall(r".*邀请\"(.+)\"加入", msg.content)
+            nickName = re.findall(r'.*邀请"(.+)"加入了群聊', msg.content)
             if nickName is None:
-                nickName = re.findall(r"\"(.+)\"通过扫描.*加入", msg.content)
+                nickName = re.findall(r'"(.+)"通过扫描.*加入群聊', msg.content)
         else:
             nickName = re.findall(r"你已添加了(.*)，现在可以开始聊天了。", msg.content)
 
         if nickName:
-            # 添加了好友，更新好友列表
-            self.allContacts[msg.sender] = nickName[0]
             if msg.from_group():
-                self.sendTextMsg(f"🧨🧨🧨 \n欢迎 {nickName[0]} 加入，\n进群请先看群公告，谢谢！", msg.roomid)
+                self.sendTextMsg(f"🧨🧨🧨 欢迎 {nickName[0]} 加入 🌼🌼🌼  \n进群请先看群公告，谢谢！", msg.roomid)
+                self.allContacts = self.getAllContacts()
             else:
                 self.sendTextMsg(f"你好 {nickName[0]}，很高兴认识你~ ", msg.sender)
+                # 添加了好友，更新好友列表
+                self.allContacts[msg.sender] = nickName[0]
 
     def enableHTTP(self) -> None:
         """暴露 HTTP 发送消息接口供外部调用，不配置则忽略"""

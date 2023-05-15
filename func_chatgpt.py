@@ -20,17 +20,25 @@ class ChatGPT():
         self.system_content_msg = {"role": "system", "content": prompt}
         self.LOG = logging.getLogger("Chat")
         self.LOG.info("ChatGPT inited")
+        self.answer_too_fast = False
+        self.last_time = datetime.now()
 
 
     def get_answer(self, question: str, wxid: str) -> str:
         # wxid或者roomid,个人时为微信id，群消息时为群id
         self.updateMessage(wxid, question, "user")
 
-        # minimalTime如果配置不为空，则使用配置的时间，否则使用默认的时间5
+        # minimal_time如果配置不为空，则使用配置的时间，否则使用默认的时间5
         if Config().CHATGPT.get("minimal"):
-            minimalTime = Config().CHATGPT.get("minimal")
+            minimal_time = Config().CHATGPT.get("minimal")
         else:
-            minimalTime = 5
+            minimal_time = 5
+
+        if self.answer_too_fast:
+            if (datetime.now() - self.last_time).total_seconds() < 30:
+                return "问得太频繁了，让我歇一歇~~"
+            minimal_time = 10
+            self.answer_too_fast = False
 
         try:
             time_start = datetime.now()  # 记录开始时间
@@ -43,8 +51,8 @@ class ChatGPT():
                 temperature=0.2
             )
             time_end = datetime.now()  # 记录结束时间
-            if (time_end - time_start).total_seconds() < minimalTime:
-                sleepTime = minimalTime - (time_end - time_start).total_seconds()
+            if (time_end - time_start).total_seconds() < minimal_time:
+                sleepTime = minimal_time - (time_end - time_start).total_seconds()
                 time.sleep(sleepTime)
                 print(f"等待{round(sleepTime, 2)}s")
 
@@ -63,10 +71,12 @@ class ChatGPT():
         except Exception as e0:
             # 如果错误包含“rate limit”字符串，说明超过了每分钟3次的限制
             if str(e0).find("rate limit") != -1:
-                rsp = "问得太快了，让我歇一会儿再来"
+                rsp = "问得太频繁了，让我歇一歇~~"
+                self.answerTooFast = True
+                self.last_time = datetime.now()
             else:
-                rsp = "发生未知错误：" + str(e0)
-
+                rsp = "机器人临时检修，请稍后访问！"
+                self.LOG.error("发生未知错误：" + str(e0))
         return rsp
 
     def updateMessage(self, wxid: str, question: str, role: str) -> None:
