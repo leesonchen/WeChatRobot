@@ -207,7 +207,7 @@ class Robot(Job):
 
         if nickName:
             if msg.from_group():
-                self.sendTextMsg(f"🧨🧨🧨 欢迎 {nickName[0]} 加入 🌼🌼🌼  \n进群请先看群公告，谢谢！", msg.roomid)
+                self.sendTextMsg(f"🧨🧨🧨 欢迎 {nickName[0]} 🌼🌼🌼  \n进群请先看群公告，谢谢！", msg.roomid)
                 self.allContacts = self.getAllContacts()
             else:
                 self.sendTextMsg(f"你好 {nickName[0]}，很高兴认识你~ ", msg.sender)
