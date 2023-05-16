@@ -73,7 +73,9 @@ class Robot(Job):
             rsp = "你@我干嘛？"
         else:  # 接了 ChatGPT，智能回复
             q = re.sub(r"@.*?[\u2005|\s]", "", msg.content).replace(" ", "")
-            rsp = self.chat.get_answer(q, (msg.roomid if msg.from_group() else msg.sender))
+            (rsp, ret) = self.chat.get_answer(q, (msg.roomid if msg.from_group() else msg.sender))
+            if not ret:
+                msg.sender = ''
 
         if rsp:
             if msg.from_group():
@@ -94,6 +96,8 @@ class Robot(Job):
         receivers = msg.roomid
         self.sendTextMsg(content, receivers, msg.sender)
         """
+        # self.LOG.info(f"Message types:\n{self.wcf.get_msg_types()}");
+        # {1: '文字', 3: '图片', 34: '语音', 37: '好友确认', 40: 'POSSIBLEFRIEND_MSG', 42: '名片', 43: '视频', 47: '石头剪刀布 |  表情图片', 48: '位置', 49: '共享实时位置、文件、转账、链接', 50: 'VOIPMSG', 51: '微信初始化', 52: 'VOIPNOTIFY', 53: 'VOIPINVITE', 62: '小视频', 9999: 'SYSNOTICE', 10000: '红包、系统消息', 10002: '撤回消息'}
 
         # 群聊消息
         if msg.from_group():
@@ -125,12 +129,12 @@ class Robot(Job):
                 if msg.content == "^更新$":
                     self.config.reload()
                     self.LOG.info("已更新")
-            else:
+            elif msg.sender != "newsapp":
                 self.toChitchat(msg)  # 闲聊
 
     def onMsg(self, msg: WxMsg) -> int:
         try:
-            self.LOG.info(f"onMsg:msg.from_group={msg.from_group()}, msg.roomid={msg.roomid}, msg.type={msg.type}, msg.sender={msg.sender}, msg.content={msg.content}")
+            self.LOG.info(f"onMsg:msg.from_group={msg.from_group()}, msg.roomid={msg.roomid}, msg.type={msg.type}, msg.sender={msg.sender}, msg.content={msg.content[:30]}")
             self.processMsg(msg)
         except Exception as e:
             self.LOG.error(e)

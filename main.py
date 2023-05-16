@@ -20,9 +20,9 @@ def weather_report(robot: Robot) -> None:
     # 获取天气，需要自己实现，可以参考 https://gitee.com/lch0821/WeatherScrapy 获取天气。
     report = "这就是获取到的天气情况了"
 
-    for r in receivers:
-        robot.sendTextMsg(report, r)
-        # robot.sendTextMsg(report, r, "nofity@all")   # 发送消息并@所有人
+    # for r in receivers:
+    #     robot.sendTextMsg(report, r)
+    #     # robot.sendTextMsg(report, r, "nofity@all")   # 发送消息并@所有人
 
 
 def main():

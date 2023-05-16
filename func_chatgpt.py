@@ -7,6 +7,7 @@ from configuration import Config
 import openai
 import time
 import logging
+import re
 
 class ChatGPT():
 
@@ -22,23 +23,34 @@ class ChatGPT():
         self.LOG.info("ChatGPT inited")
         self.answer_too_fast = False
         self.last_time = datetime.now()
+        self.minimal_time = Config().CHATGPT.get("minimal")
+        if self.minimal_time is None:
+            self.minimal_time = 5
+        elif self.minimal_time > 60:
+            self.minimal_time = 60
 
-
-    def get_answer(self, question: str, wxid: str) -> str:
+    def get_answer(self, question: str, wxid: str):
         # wxid或者roomid,个人时为微信id，群消息时为群id
         self.updateMessage(wxid, question, "user")
-
-        # minimal_time如果配置不为空，则使用配置的时间，否则使用默认的时间5
-        if Config().CHATGPT.get("minimal"):
-            minimal_time = Config().CHATGPT.get("minimal")
-        else:
-            minimal_time = 5
 
         if self.answer_too_fast:
             if (datetime.now() - self.last_time).total_seconds() < 30:
                 return "问得太频繁了，让我歇一歇~~"
-            minimal_time = 10
             self.answer_too_fast = False
+
+        # 如果内容包含#CMD#命令#param#，则执行命令
+        if "#CMD#" in question:
+            cmds = re.findall(r"#CMD#(.+)#(.*)#", question)
+            if cmds:
+                self.LOG.info(f"命令：{cmds[0][0]}, {cmds[0][1]}")
+
+                # 处理"设置时延"命令，如果参数大于60则设为60
+                if cmds[0][0] == "设置时延":
+                    self.minimal_time = int(cmds[0][1])
+                    if self.minimal_time > 60:
+                        self.minimal_time = 60
+                    return (f"已设置时延为{self.minimal_time}秒", True)
+            return ("命令格式不正确", False)
 
         try:
             time_start = datetime.now()  # 记录开始时间
@@ -51,8 +63,8 @@ class ChatGPT():
                 temperature=0.2
             )
             time_end = datetime.now()  # 记录结束时间
-            if (time_end - time_start).total_seconds() < minimal_time:
-                sleepTime = minimal_time - (time_end - time_start).total_seconds()
+            sleepTime = self.minimal_time - (time_end - time_start).total_seconds()
+            if sleepTime > 0:
                 time.sleep(sleepTime)
                 print(f"等待{round(sleepTime, 2)}s")
 
@@ -62,12 +74,16 @@ class ChatGPT():
             rsp = rsp[2:] if rsp.startswith("\n\n") else rsp
             rsp = rsp.replace("\n\n", "\n")
             self.updateMessage(wxid, rsp, "assistant")
+            return (rsp, True)
         except openai.error.AuthenticationError as e3:
-            rsp = "OpenAI API 认证失败，请检查 API 密钥是否正确"
+            rsp = "机器人临时检修，请稍后访问！"
+            self.LOG.error("OpenAI API 认证失败，请检查 API 密钥是否正确：" + str(e0))
         except openai.error.APIConnectionError as e2:
-            rsp = "无法连接到 OpenAI API，请检查网络连接"
+            rsp = "机器人临时检修，请稍后访问！"
+            self.LOG.error("无法连接到 OpenAI API，请检查网络连接：" + str(e0))
         except openai.error.APIError as e1:
-            rsp = "OpenAI API 返回了错误：" + str(e1)
+            rsp = "机器人临时检修，请稍后访问！"
+            self.LOG.error("OpenAI API 返回了错误：" + str(e0))
         except Exception as e0:
             # 如果错误包含“rate limit”字符串，说明超过了每分钟3次的限制
             if str(e0).find("rate limit") != -1:
@@ -77,7 +93,7 @@ class ChatGPT():
             else:
                 rsp = "机器人临时检修，请稍后访问！"
                 self.LOG.error("发生未知错误：" + str(e0))
-        return rsp
+        return (rsp, False)
 
     def updateMessage(self, wxid: str, question: str, role: str) -> None:
         now_time = str(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
