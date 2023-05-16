@@ -200,19 +200,20 @@ class Robot(Job):
     def sayHiToNewFriend(self, msg: WxMsg) -> None:
         if msg.from_group():
             nickName = re.findall(r'.*邀请"(.+)"加入了群聊', msg.content)
-            if nickName is None:
+            if len(nickName) == 0:
                 nickName = re.findall(r'"(.+)"通过扫描.*加入群聊', msg.content)
         else:
             nickName = re.findall(r"你已添加了(.*)，现在可以开始聊天了。", msg.content)
 
         if nickName:
             if msg.from_group():
-                self.sendTextMsg(f"🧨🧨🧨 欢迎 {nickName[0]} 🌼🌼🌼  \n进群请先看群公告，谢谢！", msg.roomid)
+                self.sendTextMsg(f"🧨🧨🧨 欢迎 {nickName[0]} 🌼🌼🌼\n进群请先看群公告，谢谢！", msg.roomid)
                 self.allContacts = self.getAllContacts()
             else:
                 self.sendTextMsg(f"你好 {nickName[0]}，很高兴认识你~ ", msg.sender)
                 # 添加了好友，更新好友列表
                 self.allContacts[msg.sender] = nickName[0]
+        self.LOG.info(f"收到新人{nickName[0]}加入消息，'{msg.content}'")
 
     def enableHTTP(self) -> None:
         """暴露 HTTP 发送消息接口供外部调用，不配置则忽略"""
